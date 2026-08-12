@@ -9,8 +9,9 @@ The build selects the newest final `mesa-X.Y.Z` tag from upstream Mesa at runtim
 Each successful workflow produces:
 
 ```text
-Mesa-Turnip-<mesa-version>.zip
+Mesa-Turnip-Emulators.<mesa-version>.zip
 SHA256SUMS.txt
+SHA512SUMS.txt
 ```
 
 The driver ZIP is an AdrenoTools-compatible flat package containing:
@@ -46,7 +47,7 @@ Push to `main`, open a pull request against `main`, or start the `Build Mesa Tur
 3. Cross-compiles Turnip with Android NDK r29.
 4. Validates that the result is an AArch64 ELF shared library.
 5. Creates and validates the AdrenoTools ZIP.
-6. Uploads the ZIP and checksum file as an artifact.
+6. Uploads the package ZIP and SHA-256/SHA-512 checksum files as an artifact.
 
 ## Local build
 
@@ -65,9 +66,29 @@ To reproduce a specific final release:
 ```bash
 docker run --rm \
   -e MESA_TAG=mesa-26.2.0 \
+  -e PACKAGE_NAME=Mesa-Turnip-Emulators \
   -v "$PWD/out:/out" \
   mesa-turnip-builder
 ```
+
+Package names use the format `<package>.<mesa-version>.zip`. The current
+build produces `Mesa-Turnip-Emulators.<mesa-version>.zip`. Reserved names for
+future packages are `Mesa-Turnip-Magisk.<mesa-version>.zip` and
+`Mesa-FreeAdreno-Magisk.<mesa-version>.zip`.
+
+### Creating a GitHub release
+
+Push a tag matching the upstream Mesa release tag to build that exact Mesa
+version and publish a GitHub release:
+
+```bash
+git tag -s mesa-26.2.0 -m "release Mesa Turnip mesa-26.2.0"
+git push origin mesa-26.2.0
+```
+
+The release contains the AdrenoTools ZIP, `SHA256SUMS.txt`, and
+`SHA512SUMS.txt`. Normal pushes to `main` build and upload workflow artifacts
+without creating a release.
 
 ## Device compatibility
 

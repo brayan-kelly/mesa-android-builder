@@ -4,6 +4,8 @@ name: Build Mesa Turnip driver
 on:
   push:
     branches: [main]
+    tags:
+      - 'mesa-*'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -35,21 +37,53 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build latest stable Mesa Turnip
+      - name: Build Mesa Turnip Emulators
+        env:
+          MESA_TAG: ${{ startsWith(github.ref, 'refs/tags/mesa-') && github.ref_name || '' }}
+          PACKAGE_NAME: Mesa-Turnip-Emulators
         run: |
           mkdir -p "$GITHUB_WORKSPACE/out"
           docker run --rm \
+            -e MESA_TAG="$MESA_TAG" \
+            -e PACKAGE_NAME="$PACKAGE_NAME" \
             -v "$GITHUB_WORKSPACE/out:/out" \
             mesa-turnip-builder:latest
 
       - name: Show artifact checksums
-        run: cat out/SHA256SUMS.txt
+        run: |
+          cat out/SHA256SUMS.txt
+          cat out/SHA512SUMS.txt
 
-      - name: Upload AdrenoTools driver
+      - name: Upload driver package
         uses: actions/upload-artifact@v4
         with:
-          name: Mesa-Turnip-AdrenoTools
+          name: Mesa-Android-Drivers
           path: |
-            out/Mesa-Turnip-*.zip
+            out/*.zip
             out/SHA256SUMS.txt
+            out/SHA512SUMS.txt
           if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/mesa-')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: Mesa-Android-Drivers
+          path: release-assets
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Mesa Turnip $GITHUB_REF_NAME" \
+            --generate-notes \
+            release-assets/*

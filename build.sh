@@ -8,6 +8,7 @@ readonly WORK_DIR="${WORK_DIR:-/work}"
 readonly OUT_DIR="${OUT_DIR:-/out}"
 readonly API_LEVEL="${API_LEVEL:-34}"
 readonly ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-/opt/android-ndk-r29}"
+readonly PACKAGE_NAME="${PACKAGE_NAME:-Mesa-Turnip-Emulators}"
 
 die() {
   echo "ERROR: $*" >&2
@@ -20,6 +21,8 @@ command -v git >/dev/null || die "git is required"
 command -v meson >/dev/null || die "meson is required"
 command -v zip >/dev/null || die "zip is required"
 command -v readelf >/dev/null || die "readelf is required"
+[[ "$PACKAGE_NAME" =~ ^[A-Za-z0-9]+([A-Za-z0-9-]*[A-Za-z0-9])?$ ]] || \
+  die "PACKAGE_NAME may contain only letters, numbers, and internal hyphens"
 
 mkdir -p "$WORK_DIR" "$OUT_DIR"
 
@@ -42,9 +45,10 @@ MESA_SRC="$WORK_DIR/mesa"
 BUILD_DIR="$WORK_DIR/build-android-aarch64"
 INSTALL_DIR="$WORK_DIR/install"
 PACKAGE_DIR="$WORK_DIR/package"
-ZIP_PATH="$OUT_DIR/Mesa-Turnip-${MESA_VERSION}.zip"
+ZIP_PATH="$OUT_DIR/${PACKAGE_NAME}.${MESA_VERSION}.zip"
 
 echo "=== Mesa release: $MESA_TAG ==="
+echo "=== Package: $PACKAGE_NAME ==="
 rm -rf "$MESA_SRC" "$BUILD_DIR" "$INSTALL_DIR" "$PACKAGE_DIR"
 
 git clone --depth=1 --branch "$MESA_TAG" "$MESA_REPO" "$MESA_SRC"
@@ -116,6 +120,7 @@ cat > "$PACKAGE_DIR/meta.json" <<EOF
 {
   "schemaVersion": 1,
   "name": "Mesa Turnip",
+  "packageName": "$PACKAGE_NAME",
   "description": "Upstream Mesa Turnip Vulkan driver for Qualcomm Adreno GPUs",
   "author": "Mesa Project",
   "packageVersion": "$MESA_VERSION",
@@ -135,5 +140,7 @@ rm -f "$ZIP_PATH"
   die "unexpected AdrenoTools ZIP contents"
 
 sha256sum "$ZIP_PATH" > "$OUT_DIR/SHA256SUMS.txt"
+sha512sum "$ZIP_PATH" > "$OUT_DIR/SHA512SUMS.txt"
 echo "=== Build complete ==="
 cat "$OUT_DIR/SHA256SUMS.txt"
+cat "$OUT_DIR/SHA512SUMS.txt"
