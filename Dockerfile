@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     file \
     flex \
     git \
+    glslang-tools \
     libdrm-dev \
     libelf-dev \
     libexpat1-dev \
