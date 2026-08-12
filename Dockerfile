@@ -27,7 +27,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-mako \
     python3-packaging \
     python3-ply \
-    python3-pyyaml \
     python3-pip \
     python3-venv \
     unzip \
@@ -37,7 +36,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv --system-site-packages /opt/venv \
-    && /opt/venv/bin/python -m pip install --no-cache-dir 'meson>=1.4.0,<2' \
+    && /opt/venv/bin/python -m pip install --no-cache-dir \
+        'meson>=1.4.0,<2' \
+        'PyYAML==6.0.2' \
+    && /opt/venv/bin/python -c 'import yaml; print("PyYAML", yaml.__version__)' \
     && /opt/venv/bin/meson --version
 
 WORKDIR /opt
