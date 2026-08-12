@@ -27,6 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-mako \
     python3-packaging \
     python3-ply \
+    python3-pyyaml \
     python3-pip \
     python3-venv \
     unzip \
