@@ -79,7 +79,7 @@ endian = 'little'
 EOF
 
 echo "=== Configuring upstream Android KGSL Turnip ==="
-meson setup "$BUILD_DIR" \
+meson setup "$BUILD_DIR" "$MESA_SRC" \
   --cross-file "$WORK_DIR/android-aarch64.txt" \
   --prefix "$INSTALL_DIR" \
   -Dbuildtype=release \
