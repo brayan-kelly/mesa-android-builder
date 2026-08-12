@@ -4,7 +4,7 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive \
     ANDROID_NDK_HOME=/opt/android-ndk-r29 \
     API_LEVEL=34 \
-    PATH=/opt/android-ndk-r29/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+    PATH=/opt/venv/bin:/opt/android-ndk-r29/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bison \
@@ -26,11 +26,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-mako \
     python3-packaging \
     python3-ply \
+    python3-pip \
+    python3-venv \
     unzip \
     wget \
     zip \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m venv --system-site-packages /opt/venv \
+    && /opt/venv/bin/python -m pip install --no-cache-dir 'meson>=1.4.0,<2' \
+    && /opt/venv/bin/meson --version
 
 WORKDIR /opt
 
