@@ -139,8 +139,8 @@ rm -f "$ZIP_PATH"
 [[ "$(unzip -Z1 "$ZIP_PATH" | sort)" == $'libvulkan_freedreno.so\nmeta.json' ]] || \
   die "unexpected AdrenoTools ZIP contents"
 
-sha256sum "$ZIP_PATH" > "$OUT_DIR/SHA256SUMS.txt"
-sha512sum "$ZIP_PATH" > "$OUT_DIR/SHA512SUMS.txt"
+(cd "$OUT_DIR" && sha256sum "$(basename "$ZIP_PATH")" > SHA256SUMS.txt)
+(cd "$OUT_DIR" && sha512sum "$(basename "$ZIP_PATH")" > SHA512SUMS.txt)
 echo "=== Build complete ==="
 cat "$OUT_DIR/SHA256SUMS.txt"
 cat "$OUT_DIR/SHA512SUMS.txt"
