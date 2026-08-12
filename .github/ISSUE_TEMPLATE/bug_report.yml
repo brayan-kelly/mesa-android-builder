@@ -1,0 +1,38 @@
+name: Build or driver issue
+description: Report a reproducible build or runtime problem.
+title: "[issue] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not attach private logs, credentials, or device data containing personal information.
+  - type: input
+    id: mesa-version
+    attributes:
+      label: Mesa version
+      description: The Mesa tag shown in meta.json.
+      placeholder: mesa-26.2.0
+    validations:
+      required: true
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU model and ID
+      description: Output from gpu_model and gpu_id, with sensitive data removed.
+    validations:
+      required: true
+  - type: input
+    id: android
+    attributes:
+      label: Android version
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Include the smallest useful log excerpt and the command used to obtain it.
+      render: text
+    validations:
+      required: true

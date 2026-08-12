@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: MIT
+name: Build Mesa Turnip driver
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mesa-turnip-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out builder
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build builder image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: mesa-turnip-builder:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build latest stable Mesa Turnip
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/out:/out" \
+            mesa-turnip-builder:latest
+
+      - name: Show artifact checksums
+        run: cat out/SHA256SUMS.txt
+
+      - name: Upload AdrenoTools driver
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mesa-Turnip-AdrenoTools
+          path: |
+            out/Mesa-Turnip-*.zip
+            out/SHA256SUMS.txt
+          if-no-files-found: error

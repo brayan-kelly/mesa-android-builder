@@ -1,0 +1,88 @@
+# Mesa Turnip Android Builder
+
+GitHub Actions project for building the latest official stable Mesa Turnip Vulkan driver for Android ARM64 devices using the KGSL backend.
+
+The build selects the newest final `mesa-X.Y.Z` tag from upstream Mesa at runtime. Release candidates, beta tags, development branches, and external patch sets are excluded.
+
+## Output
+
+Each successful workflow produces:
+
+```text
+Mesa-Turnip-<mesa-version>.zip
+SHA256SUMS.txt
+```
+
+The driver ZIP is an AdrenoTools-compatible flat package containing:
+
+```text
+libvulkan_freedreno.so
+meta.json
+```
+
+This project intentionally builds Turnip only. It does not build or install a Magisk module, replace Android GLES libraries, or modify a device automatically.
+
+## Build configuration
+
+The build uses the upstream Mesa Android configuration:
+
+```text
+platforms=android
+platform-sdk-version=34
+android-stub=true
+gallium-drivers=
+vulkan-drivers=freedreno
+freedreno-kmds=kgsl
+```
+
+See the [Mesa Android build documentation](https://docs.mesa3d.org/android.html) for the upstream configuration and the [Freedreno documentation](https://docs.mesa3d.org/drivers/freedreno.html) for hardware support information.
+
+## GitHub Actions
+
+Push to `main`, open a pull request against `main`, or start the `Build Mesa Turnip driver` workflow manually. The workflow:
+
+1. Builds the Docker image.
+2. Discovers the newest stable Mesa tag.
+3. Cross-compiles Turnip with Android NDK r29.
+4. Validates that the result is an AArch64 ELF shared library.
+5. Creates and validates the AdrenoTools ZIP.
+6. Uploads the ZIP and checksum file as an artifact.
+
+## Local build
+
+Docker is required. From the repository root:
+
+```bash
+mkdir -p out
+docker build -t mesa-turnip-builder .
+docker run --rm -v "$PWD/out:/out" mesa-turnip-builder
+```
+
+The build downloads the newest stable Mesa release during the container run, so the result is tied to the upstream release available at that time. The selected tag and commit are stored in `meta.json`.
+
+To reproduce a specific final release:
+
+```bash
+docker run --rm \
+  -e MESA_TAG=mesa-26.2.0 \
+  -v "$PWD/out:/out" \
+  mesa-turnip-builder
+```
+
+## Device compatibility
+
+A successful compilation does not guarantee that a driver will initialize on every Qualcomm device. Compatibility depends on the GPU ID, Android version, KGSL implementation, firmware, loader, and the upstream Mesa release.
+
+Before testing on a rooted development device, record:
+
+```bash
+adb shell getprop ro.build.version.sdk
+adb shell cat /sys/class/kgsl/kgsl-3d0/gpu_model
+adb shell cat /sys/class/kgsl/kgsl-3d0/gpu_id
+```
+
+Use a recovery path and keep the stock vendor driver available. Do not flash an untested driver on a production device.
+
+## Scope and licensing
+
+The builder scripts, Dockerfile, workflow, and documentation in this repository are licensed under the [MIT License](LICENSE). Mesa is a separate project: most Mesa code is MIT-licensed, while individual Mesa files and third-party components may use different licenses. The generated driver remains subject to the licenses included by the exact Mesa source revision used for the build and is not an official Mesa release artifact. See Mesa's [license and copyright documentation](https://docs.mesa3d.org/license.html).
