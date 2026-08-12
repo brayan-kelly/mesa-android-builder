@@ -54,9 +54,13 @@ echo "=== Mesa commit: $MESA_COMMIT ==="
 TOOLCHAIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64"
 ANDROID_CLANG="$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang"
 ANDROID_CLANGXX="$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang++"
+ANDROID_AR="$TOOLCHAIN/bin/llvm-ar"
+ANDROID_STRIP="$TOOLCHAIN/bin/llvm-strip"
 
 [[ -x "$ANDROID_CLANG" ]] || die "missing Android C compiler: $ANDROID_CLANG"
 [[ -x "$ANDROID_CLANGXX" ]] || die "missing Android C++ compiler: $ANDROID_CLANGXX"
+[[ -x "$ANDROID_AR" ]] || die "missing Android archiver: $ANDROID_AR"
+[[ -x "$ANDROID_STRIP" ]] || die "missing Android strip tool: $ANDROID_STRIP"
 
 cat > "$WORK_DIR/android-aarch64.txt" <<EOF
 [constants]
@@ -64,12 +68,12 @@ ndk_path = '$ANDROID_NDK_HOME'
 toolchain_path = ndk_path / 'toolchains/llvm/prebuilt/linux-x86_64'
 
 [binaries]
-ar = toolchain_path / 'bin/aarch64-linux-android-ar'
+ar = toolchain_path / 'bin/llvm-ar'
 c = [toolchain_path / 'bin/aarch64-linux-android${API_LEVEL}-clang']
 cpp = [toolchain_path / 'bin/aarch64-linux-android${API_LEVEL}-clang++', '-fno-exceptions', '-fno-unwind-tables', '-fno-asynchronous-unwind-tables', '--start-no-unused-arguments', '-static-libstdc++', '--end-no-unused-arguments']
 c_ld = 'lld'
 cpp_ld = 'lld'
-strip = toolchain_path / 'bin/aarch64-linux-android-strip'
+strip = toolchain_path / 'bin/llvm-strip'
 
 [host_machine]
 system = 'android'
