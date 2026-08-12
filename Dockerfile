@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     lld \
     meson \
     ninja-build \
+    patchelf \
     pkg-config \
     python3 \
     python3-mako \
@@ -51,6 +52,10 @@ RUN curl -fsSL \
     && rm -f /tmp/android-ndk.zip
 
 COPY build.sh /opt/build.sh
-RUN chmod 0755 /opt/build.sh
+COPY mesa-build-common.sh /opt/mesa-build-common.sh
+COPY build-turnip-magisk.sh /opt/build-turnip-magisk.sh
+COPY build-freeadreno-magisk.sh /opt/build-freeadreno-magisk.sh
+RUN chmod 0755 /opt/build.sh /opt/mesa-build-common.sh \
+    /opt/build-turnip-magisk.sh /opt/build-freeadreno-magisk.sh
 
 ENTRYPOINT ["/opt/build.sh"]

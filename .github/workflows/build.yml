@@ -64,9 +64,93 @@ jobs:
             out/SHA512SUMS.txt
           if-no-files-found: error
 
+  build-turnip-magisk:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out builder
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build builder image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: mesa-turnip-builder:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Turnip Magisk module
+        env:
+          MESA_TAG: ${{ startsWith(github.ref, 'refs/tags/mesa-') && github.ref_name || '' }}
+          MAGISK_VULKAN_FILENAME: vulkan.adreno.so
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          docker run --rm \
+            --entrypoint /opt/build-turnip-magisk.sh \
+            -e MESA_TAG="$MESA_TAG" \
+            -e MAGISK_VULKAN_FILENAME="$MAGISK_VULKAN_FILENAME" \
+            -v "$GITHUB_WORKSPACE/out:/out" \
+            mesa-turnip-builder:latest
+
+      - name: Upload Turnip Magisk module
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mesa-Turnip-Magisk
+          path: |
+            out/Mesa-Turnip-Magisk.*.zip
+            out/SHA256SUMS.txt
+            out/SHA512SUMS.txt
+          if-no-files-found: error
+
+  build-freeadreno:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out builder
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build builder image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: mesa-turnip-builder:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build FreeAdreno Magisk module
+        env:
+          MESA_TAG: ${{ startsWith(github.ref, 'refs/tags/mesa-') && github.ref_name || '' }}
+          FREEADRENO_KMDS: msm
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          docker run --rm \
+            --entrypoint /opt/build-freeadreno-magisk.sh \
+            -e MESA_TAG="$MESA_TAG" \
+            -e FREEADRENO_KMDS="$FREEADRENO_KMDS" \
+            -v "$GITHUB_WORKSPACE/out:/out" \
+            mesa-turnip-builder:latest
+
+      - name: Upload FreeAdreno Magisk module
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mesa-FreeAdreno-Magisk
+          path: |
+            out/Mesa-FreeAdreno-Magisk.*.zip
+            out/SHA256SUMS.txt
+            out/SHA512SUMS.txt
+          if-no-files-found: error
+
   release:
     if: startsWith(github.ref, 'refs/tags/mesa-')
-    needs: build
+    needs: [build, build-turnip-magisk, build-freeadreno]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -76,7 +160,32 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: Mesa-Android-Drivers
-          path: release-assets
+          path: release-assets/emulators
+
+      - name: Download Turnip Magisk assets
+        uses: actions/download-artifact@v4
+        with:
+          name: Mesa-Turnip-Magisk
+          path: release-assets/turnip-magisk
+
+      - name: Download FreeAdreno Magisk assets
+        uses: actions/download-artifact@v4
+        with:
+          name: Mesa-FreeAdreno-Magisk
+          path: release-assets/freeadreno-magisk
+
+      - name: Prepare release assets
+        run: |
+          cp release-assets/emulators/*.zip release-assets/
+          cp release-assets/emulators/SHA256SUMS.txt release-assets/SHA256SUMS-Turnip-Emulators.txt
+          cp release-assets/emulators/SHA512SUMS.txt release-assets/SHA512SUMS-Turnip-Emulators.txt
+          cp release-assets/turnip-magisk/*.zip release-assets/
+          cp release-assets/turnip-magisk/SHA256SUMS.txt release-assets/SHA256SUMS-Turnip-Magisk.txt
+          cp release-assets/turnip-magisk/SHA512SUMS.txt release-assets/SHA512SUMS-Turnip-Magisk.txt
+          cp release-assets/freeadreno-magisk/*.zip release-assets/
+          cp release-assets/freeadreno-magisk/SHA256SUMS.txt release-assets/SHA256SUMS-FreeAdreno-Magisk.txt
+          cp release-assets/freeadreno-magisk/SHA512SUMS.txt release-assets/SHA512SUMS-FreeAdreno-Magisk.txt
+          rm -rf release-assets/emulators release-assets/turnip-magisk release-assets/freeadreno-magisk
 
       - name: Create GitHub release
         env:
@@ -84,6 +193,6 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "Mesa Turnip $GITHUB_REF_NAME" \
+            --title "Mesa Android Drivers $GITHUB_REF_NAME" \
             --generate-notes \
             release-assets/*
