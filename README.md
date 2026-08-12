@@ -21,14 +21,13 @@ libvulkan_freedreno.so
 meta.json
 ```
 
-The workflow also has separate experimental jobs for the two Magisk packages:
+The workflow also has a separate job for the Magisk package:
 
 ```text
 Mesa-Turnip-Magisk.<mesa-version>.zip
-Mesa-FreeAdreno-Magisk.<mesa-version>.zip
 ```
 
-They are uploaded as separate GitHub Actions artifacts. No package installs
+It is uploaded as a separate GitHub Actions artifact. No package installs
 anything on a device automatically.
 
 ## Build configuration
@@ -61,13 +60,6 @@ The `build-turnip-magisk` job repeats the Turnip build and packages it as a
 Magisk module under `system/vendor/lib64/hw/`. The Vulkan HAL filename is
 device-specific; the workflow default is `vulkan.adreno.so`, and local builds
 can override it with `MAGISK_VULKAN_FILENAME`.
-
-The `build-freeadreno` job is separate because it builds Mesa Freedreno
-GLES/EGL, not Turnip Vulkan. Its default KMD is `msm` and its Magisk module
-contains the AArch64 Mesa libraries under `system/vendor/lib64/egl/` and
-`system/vendor/lib64/libgallium_dri.so`. Optional DRI aliases are included
-when Mesa installs them. Set `FREEADRENO_KMDS` to select another supported KMD
-when building locally.
 
 ## Local build
 
@@ -104,19 +96,7 @@ docker run --rm \
   mesa-turnip-builder
 ```
 
-Build the experimental FreeAdreno GLES/EGL Magisk module separately:
-
-```bash
-docker run --rm \
-  --entrypoint /opt/build-freeadreno-magisk.sh \
-  -e MESA_TAG=mesa-26.2.0 \
-  -e FREEADRENO_KMDS=msm \
-  -v "$PWD/out:/out" \
-  mesa-turnip-builder
-```
-
-Each separate build writes its package and `SHA256SUMS.txt`/
-`SHA512SUMS.txt` into `out/`.
+The build writes its package and `SHA256SUMS.txt`/`SHA512SUMS.txt` into `out/`.
 
 ### Creating a GitHub release
 
@@ -150,12 +130,9 @@ For a Turnip Magisk package, first identify the stock Vulkan HAL filename:
 adb shell find /vendor/lib64/hw -maxdepth 1 -type f -name 'vulkan*.so' -print
 ```
 
-Pass the matching filename as `MAGISK_VULKAN_FILENAME` when building. The
-FreeAdreno package is not a universal replacement for stock Android GLES:
-upstream Mesa documents that Freedreno Gallium does not support KGSL, so the
-default `msm` build is intended for compatible DRM/MSM systems. Use a recovery
-path and keep the stock vendor driver available. Do not flash an untested
-driver on a production device.
+Pass the matching filename as `MAGISK_VULKAN_FILENAME` when building. Use a
+recovery path and keep the stock vendor driver available. Do not flash an
+untested driver on a production device.
 
 ## Scope and licensing
 
