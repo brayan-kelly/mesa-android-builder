@@ -32,6 +32,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          platforms: linux/amd64
           load: true
           tags: mesa-turnip-builder:latest
           cache-from: type=gha

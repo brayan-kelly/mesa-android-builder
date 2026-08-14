@@ -62,8 +62,9 @@ Docker is required. From the repository root:
 
 ```bash
 mkdir -p out
-docker build -t mesa-turnip-builder .
+docker build --platform linux/amd64 -t mesa-turnip-builder .
 docker run --rm \
+  --platform linux/amd64 \
   -e MAGISK_VULKAN_FILENAME=vulkan.adreno.so \
   -v "$PWD/out:/out" \
   mesa-turnip-builder
@@ -75,6 +76,7 @@ To reproduce a specific final release:
 
 ```bash
 docker run --rm \
+  --platform linux/amd64 \
   -e MESA_TAG=mesa-26.2.0 \
   -e PACKAGE_NAME=Mesa-Turnip-Emulators \
   -e MAGISK_VULKAN_FILENAME=vulkan.adreno.so \
