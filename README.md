@@ -10,6 +10,7 @@ Each successful workflow produces:
 
 ```text
 Mesa-Turnip-Emulators.<mesa-version>.zip
+Mesa-Turnip-Magisk.<mesa-version>.zip
 SHA256SUMS.txt
 SHA512SUMS.txt
 ```
@@ -21,14 +22,8 @@ libvulkan_freedreno.so
 meta.json
 ```
 
-The workflow also has a separate job for the Magisk package:
-
-```text
-Mesa-Turnip-Magisk.<mesa-version>.zip
-```
-
-It is uploaded as a separate GitHub Actions artifact. No package installs
-anything on a device automatically.
+Both packages are produced from the same compiled Turnip library. No package
+installs anything on a device automatically.
 
 ## Build configuration
 
@@ -53,13 +48,13 @@ Push to `main`, open a pull request against `main`, or start the `Build Mesa Tur
 2. Discovers the newest stable Mesa tag.
 3. Cross-compiles Turnip with Android NDK r29.
 4. Validates that the result is an AArch64 ELF shared library.
-5. Creates and validates the AdrenoTools ZIP.
-6. Uploads the package ZIP and SHA-256/SHA-512 checksum files as an artifact.
+5. Creates and validates both the AdrenoTools ZIP and Magisk module ZIP from the same binary.
+6. Uploads both package ZIPs and combined SHA-256/SHA-512 checksum files as one artifact.
 
-The `build-turnip-magisk` job repeats the Turnip build and packages it as a
-Magisk module under `system/vendor/lib64/hw/`. The Vulkan HAL filename is
-device-specific; the workflow default is `vulkan.adreno.so`, and local builds
-can override it with `MAGISK_VULKAN_FILENAME`.
+The Magisk package contains the same compiled driver under
+`system/vendor/lib64/hw/`. Its SONAME and filename are changed to the
+device-specific Vulkan HAL name; the workflow default is `vulkan.adreno.so`,
+and local builds can override it with `MAGISK_VULKAN_FILENAME`.
 
 ## Local build
 
@@ -68,7 +63,10 @@ Docker is required. From the repository root:
 ```bash
 mkdir -p out
 docker build -t mesa-turnip-builder .
-docker run --rm -v "$PWD/out:/out" mesa-turnip-builder
+docker run --rm \
+  -e MAGISK_VULKAN_FILENAME=vulkan.adreno.so \
+  -v "$PWD/out:/out" \
+  mesa-turnip-builder
 ```
 
 The build downloads the newest stable Mesa release during the container run, so the result is tied to the upstream release available at that time. The selected tag and commit are stored in `meta.json`.
@@ -79,24 +77,14 @@ To reproduce a specific final release:
 docker run --rm \
   -e MESA_TAG=mesa-26.2.0 \
   -e PACKAGE_NAME=Mesa-Turnip-Emulators \
-  -v "$PWD/out:/out" \
-  mesa-turnip-builder
-```
-
-Package names use the format `<package>.<mesa-version>.zip`.
-
-Build the Turnip Magisk module separately:
-
-```bash
-docker run --rm \
-  --entrypoint /opt/build-turnip-magisk.sh \
-  -e MESA_TAG=mesa-26.2.0 \
   -e MAGISK_VULKAN_FILENAME=vulkan.adreno.so \
   -v "$PWD/out:/out" \
   mesa-turnip-builder
 ```
 
-The build writes its package and `SHA256SUMS.txt`/`SHA512SUMS.txt` into `out/`.
+The single build writes both package ZIPs and combined
+`SHA256SUMS.txt`/`SHA512SUMS.txt` files into `out/`.
+Package names use the format `<package>.<mesa-version>.zip`.
 
 ### Creating a GitHub release
 
@@ -108,9 +96,9 @@ git tag -s mesa-26.2.0 -m "release Mesa Turnip mesa-26.2.0"
 git push origin mesa-26.2.0
 ```
 
-The release contains the AdrenoTools ZIP, `SHA256SUMS.txt`, and
-`SHA512SUMS.txt`. Normal pushes to `main` build and upload workflow artifacts
-without creating a release.
+The release contains both the AdrenoTools and Magisk ZIPs, plus combined
+`SHA256SUMS.txt` and `SHA512SUMS.txt` files. Normal pushes to `main` build and
+upload workflow artifacts without creating a release.
 
 ## Device compatibility
 

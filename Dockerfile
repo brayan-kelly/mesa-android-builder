@@ -53,8 +53,6 @@ RUN curl -fsSL \
 
 COPY build.sh /opt/build.sh
 COPY mesa-build-common.sh /opt/mesa-build-common.sh
-COPY build-turnip-magisk.sh /opt/build-turnip-magisk.sh
-RUN chmod 0755 /opt/build.sh /opt/mesa-build-common.sh \
-    /opt/build-turnip-magisk.sh
+RUN chmod 0755 /opt/build.sh /opt/mesa-build-common.sh
 
 ENTRYPOINT ["/opt/build.sh"]

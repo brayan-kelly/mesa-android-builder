@@ -9,6 +9,8 @@ readonly OUT_DIR="${OUT_DIR:-/out}"
 readonly API_LEVEL="${API_LEVEL:-34}"
 readonly ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-/opt/android-ndk-r29}"
 readonly PACKAGE_NAME="${PACKAGE_NAME:-Mesa-Turnip-Emulators}"
+readonly MAGISK_PACKAGE_NAME="Mesa-Turnip-Magisk"
+readonly MAGISK_VULKAN_FILENAME="${MAGISK_VULKAN_FILENAME:-vulkan.adreno.so}"
 
 die() {
   echo "ERROR: $*" >&2
@@ -21,8 +23,11 @@ command -v git >/dev/null || die "git is required"
 command -v meson >/dev/null || die "meson is required"
 command -v zip >/dev/null || die "zip is required"
 command -v readelf >/dev/null || die "readelf is required"
+command -v patchelf >/dev/null || die "patchelf is required"
 [[ "$PACKAGE_NAME" =~ ^[A-Za-z0-9]+([A-Za-z0-9-]*[A-Za-z0-9])?$ ]] || \
   die "PACKAGE_NAME may contain only letters, numbers, and internal hyphens"
+[[ "$MAGISK_VULKAN_FILENAME" =~ ^vulkan\.[A-Za-z0-9_-]+\.so$ ]] || \
+  die "MAGISK_VULKAN_FILENAME must look like vulkan.adreno.so"
 
 mkdir -p "$WORK_DIR" "$OUT_DIR"
 
@@ -41,15 +46,19 @@ else
 fi
 
 MESA_VERSION="${MESA_TAG#mesa-}"
+MESA_VERSION_CODE="$(awk -F. '{ printf "%d%02d%02d", $1, $2, $3 }' <<< "$MESA_VERSION")"
 MESA_SRC="$WORK_DIR/mesa"
 BUILD_DIR="$WORK_DIR/build-android-aarch64"
 INSTALL_DIR="$WORK_DIR/install"
 PACKAGE_DIR="$WORK_DIR/package"
 ZIP_PATH="$OUT_DIR/${PACKAGE_NAME}.${MESA_VERSION}.zip"
+MAGISK_PACKAGE_DIR="$WORK_DIR/package-turnip-magisk"
+MAGISK_ZIP_PATH="$OUT_DIR/${MAGISK_PACKAGE_NAME}.${MESA_VERSION}.zip"
 
 echo "=== Mesa release: $MESA_TAG ==="
-echo "=== Package: $PACKAGE_NAME ==="
-rm -rf "$MESA_SRC" "$BUILD_DIR" "$INSTALL_DIR" "$PACKAGE_DIR"
+echo "=== Packages: $PACKAGE_NAME and $MAGISK_PACKAGE_NAME ==="
+rm -rf "$MESA_SRC" "$BUILD_DIR" "$INSTALL_DIR" "$PACKAGE_DIR" \
+  "$MAGISK_PACKAGE_DIR" "$ZIP_PATH" "$MAGISK_ZIP_PATH"
 
 git clone --depth=1 --branch "$MESA_TAG" "$MESA_REPO" "$MESA_SRC"
 MESA_COMMIT="$(git -C "$MESA_SRC" rev-parse HEAD)"
@@ -119,15 +128,12 @@ cp -L "$VULKAN_SO" "$PACKAGE_DIR/libvulkan_freedreno.so"
 cat > "$PACKAGE_DIR/meta.json" <<EOF
 {
   "schemaVersion": 1,
-  "name": "Mesa Turnip",
-  "packageName": "$PACKAGE_NAME",
-  "description": "Upstream Mesa Turnip Vulkan driver for Qualcomm Adreno GPUs",
+  "name": "Mesa Turnip $MESA_VERSION",
+  "description": "Upstream Mesa Turnip Vulkan driver for Qualcomm Adreno GPUs; tag $MESA_TAG, commit $MESA_COMMIT",
   "author": "Mesa Project",
-  "packageVersion": "$MESA_VERSION",
+  "packageVersion": "1",
   "vendor": "Mesa",
   "driverVersion": "Mesa $MESA_VERSION",
-  "mesaTag": "$MESA_TAG",
-  "mesaCommit": "$MESA_COMMIT",
   "minApi": 28,
   "libraryName": "libvulkan_freedreno.so"
 }
@@ -139,8 +145,38 @@ rm -f "$ZIP_PATH"
 [[ "$(unzip -Z1 "$ZIP_PATH" | sort)" == $'libvulkan_freedreno.so\nmeta.json' ]] || \
   die "unexpected AdrenoTools ZIP contents"
 
-(cd "$OUT_DIR" && sha256sum "$(basename "$ZIP_PATH")" > SHA256SUMS.txt)
-(cd "$OUT_DIR" && sha512sum "$(basename "$ZIP_PATH")" > SHA512SUMS.txt)
+MAGISK_LIBRARY="$MAGISK_PACKAGE_DIR/system/vendor/lib64/hw/$MAGISK_VULKAN_FILENAME"
+mkdir -p "${MAGISK_LIBRARY%/*}"
+cp -L "$VULKAN_SO" "$MAGISK_LIBRARY"
+patchelf --set-soname "$MAGISK_VULKAN_FILENAME" "$MAGISK_LIBRARY"
+
+cat > "$MAGISK_PACKAGE_DIR/module.prop" <<EOF
+id=mesa-turnip
+name=Mesa Turnip
+version=$MESA_VERSION
+versionCode=$MESA_VERSION_CODE
+author=Mesa Project
+description=Experimental upstream Mesa Turnip Vulkan driver; HAL filename: $MAGISK_VULKAN_FILENAME
+EOF
+cat > "$MAGISK_PACKAGE_DIR/README.txt" <<EOF
+Mesa Turnip Magisk module
+Mesa tag: $MESA_TAG
+Mesa commit: $MESA_COMMIT
+Vulkan HAL filename: $MAGISK_VULKAN_FILENAME
+
+The Vulkan HAL filename is device-specific. Override MAGISK_VULKAN_FILENAME
+when building this package. Keep a recovery path and disable this module from
+Magisk Safe Mode if Android fails to boot.
+EOF
+
+(cd "$MAGISK_PACKAGE_DIR" && zip -9 -r "$MAGISK_ZIP_PATH" module.prop README.txt system)
+unzip -Z1 "$MAGISK_ZIP_PATH" | grep -qx 'module.prop' || \
+  die "Magisk module.prop is missing"
+unzip -Z1 "$MAGISK_ZIP_PATH" | grep -qx "system/vendor/lib64/hw/$MAGISK_VULKAN_FILENAME" || \
+  die "Magisk Vulkan library is missing"
+
+(cd "$OUT_DIR" && sha256sum "$(basename "$ZIP_PATH")" "$(basename "$MAGISK_ZIP_PATH")" > SHA256SUMS.txt)
+(cd "$OUT_DIR" && sha512sum "$(basename "$ZIP_PATH")" "$(basename "$MAGISK_ZIP_PATH")" > SHA512SUMS.txt)
 echo "=== Build complete ==="
 cat "$OUT_DIR/SHA256SUMS.txt"
 cat "$OUT_DIR/SHA512SUMS.txt"
