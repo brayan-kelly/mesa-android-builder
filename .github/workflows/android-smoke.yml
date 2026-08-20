@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: MIT
+name: Android Vulkan smoke test
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Android package to launch
+        required: true
+        default: com.armsx3
+      activity:
+        description: Fully qualified launch activity component
+        required: true
+        default: com.armsx3/com.armsx2.BootSplashActivity
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    runs-on: [self-hosted, android-device]
+
+    steps:
+      - name: Check out builder
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Launch and capture Android app
+        env:
+          APP_PACKAGE: ${{ inputs.package }}
+          APP_ACTIVITY: ${{ inputs.activity }}
+        run: |
+          set -Eeuo pipefail
+          adb wait-for-device
+          {
+            adb shell getprop ro.build.version.sdk
+            adb shell getprop ro.hardware.vulkan
+            adb shell getprop ro.gfx.driver.1
+          } > device-graphics.txt
+          adb shell cat /sys/class/kgsl/kgsl-3d0/gpu_model > gpu-model.txt || true
+          adb shell cat /sys/class/kgsl/kgsl-3d0/gpu_id > gpu-id.txt || true
+          adb shell am force-stop "$APP_PACKAGE"
+          adb shell am start -n "$APP_ACTIVITY" | tee launch.txt
+          sleep 8
+          adb shell pidof "$APP_PACKAGE" | tee pid.txt
+          adb shell dumpsys activity activities > activity.txt
+          adb logcat -d -v threadtime -t 500 \
+            | rg -i 'ActivityTaskManager|ActivityManager|AndroidRuntime|FATAL|Fatal signal|RenderThread|vulkan|adreno|turnip|freedreno|AHardwareBuffer|GrBackendFormat|com\.armsx3' \
+            > logcat-filtered.txt || true
+          rg -m 1 "topResumedActivity=.*${APP_PACKAGE}|ResumedActivity:.*${APP_PACKAGE}" activity.txt
+          test -s pid.txt
+
+      - name: Upload smoke-test evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-vulkan-smoke-${{ inputs.package }}
+          retention-days: 1
+          path: |
+            device-graphics.txt
+            gpu-model.txt
+            gpu-id.txt
+            launch.txt
+            pid.txt
+            activity.txt
+            logcat-filtered.txt
+          if-no-files-found: ignore

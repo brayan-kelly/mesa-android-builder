@@ -23,13 +23,18 @@ jobs:
 
     steps:
       - name: Check out builder
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Validate builder scripts
+        run: |
+          bash -n build.sh
+          git diff --check
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
 
       - name: Build builder image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
           platforms: linux/amd64
@@ -40,8 +45,8 @@ jobs:
 
       - name: Build Mesa Turnip packages
         env:
-          MESA_TAG: ${{ startsWith(github.ref, 'refs/tags/mesa-') && github.ref_name || '' }}
-          PACKAGE_NAME: Mesa-Turnip-Emulators
+          MESA_TAG: ${{ startsWith(github.ref, 'refs/tags/mesa-') && github.ref_name || 'mesa-26.2.0' }}
+          PACKAGE_NAME: Mesa-Turnip-AdrenoTools
           MAGISK_VULKAN_FILENAME: vulkan.adreno.so
         run: |
           mkdir -p "$GITHUB_WORKSPACE/out"
@@ -58,9 +63,9 @@ jobs:
           cat out/SHA512SUMS.txt
 
       - name: Upload driver package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: Mesa-Android-Drivers
+          name: Mesa-Turnip-Android-Driver-Pack
           path: |
             out/*.zip
             out/SHA256SUMS.txt
@@ -75,11 +80,17 @@ jobs:
       contents: write
 
     steps:
+      - name: Check out release-note extractor
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
       - name: Download release assets
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: Mesa-Android-Drivers
+          name: Mesa-Turnip-Android-Driver-Pack
           path: release-assets
+
+      - name: Generate filtered Turnip release notes
+        run: scripts/extract-turnip-notes.sh "$GITHUB_REF_NAME" /tmp/mesa-turnip-notes.md
 
       - name: Create GitHub release
         env:
@@ -87,6 +98,6 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "Mesa Android Drivers $GITHUB_REF_NAME" \
-            --generate-notes \
+            --title "Mesa Turnip Android Driver Pack $GITHUB_REF_NAME" \
+            --notes-file /tmp/mesa-turnip-notes.md \
             release-assets/*

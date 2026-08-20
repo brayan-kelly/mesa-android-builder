@@ -8,7 +8,7 @@ readonly WORK_DIR="${WORK_DIR:-/work}"
 readonly OUT_DIR="${OUT_DIR:-/out}"
 readonly API_LEVEL="${API_LEVEL:-34}"
 readonly ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-/opt/android-ndk-r29}"
-readonly PACKAGE_NAME="${PACKAGE_NAME:-Mesa-Turnip-Emulators}"
+readonly PACKAGE_NAME="${PACKAGE_NAME:-Mesa-Turnip-AdrenoTools}"
 readonly MAGISK_PACKAGE_NAME="Mesa-Turnip-Magisk"
 readonly MAGISK_VULKAN_FILENAME="${MAGISK_VULKAN_FILENAME:-vulkan.adreno.so}"
 
@@ -24,6 +24,7 @@ command -v meson >/dev/null || die "meson is required"
 command -v zip >/dev/null || die "zip is required"
 command -v readelf >/dev/null || die "readelf is required"
 command -v patchelf >/dev/null || die "patchelf is required"
+command -v python3 >/dev/null || die "python3 is required"
 [[ "$PACKAGE_NAME" =~ ^[A-Za-z0-9]+([A-Za-z0-9-]*[A-Za-z0-9])?$ ]] || \
   die "PACKAGE_NAME may contain only letters, numbers, and internal hyphens"
 [[ "$MAGISK_VULKAN_FILENAME" =~ ^vulkan\.[A-Za-z0-9_-]+\.so$ ]] || \
@@ -121,6 +122,8 @@ VULKAN_SO="$INSTALL_DIR/lib/libvulkan_freedreno.so"
 
 readelf -h "$VULKAN_SO" | grep -q 'AArch64' || \
   die "driver is not an AArch64 ELF: $VULKAN_SO"
+readelf -d "$VULKAN_SO" | grep -Eq 'SONAME.*libvulkan_freedreno\.so' || \
+  die "driver SONAME is not libvulkan_freedreno.so: $VULKAN_SO"
 
 mkdir -p "$PACKAGE_DIR"
 cp -L "$VULKAN_SO" "$PACKAGE_DIR/libvulkan_freedreno.so"
@@ -134,13 +137,20 @@ cat > "$PACKAGE_DIR/meta.json" <<EOF
   "packageVersion": "1",
   "vendor": "Mesa",
   "driverVersion": "Mesa $MESA_VERSION",
+  "mesaTag": "$MESA_TAG",
+  "mesaCommit": "$MESA_COMMIT",
+  "apiLevel": $API_LEVEL,
+  "androidNdk": "r29",
   "minApi": 28,
   "libraryName": "libvulkan_freedreno.so"
 }
 EOF
 
+python3 -m json.tool "$PACKAGE_DIR/meta.json" >/dev/null || \
+  die "generated meta.json is invalid"
+touch -d '1970-01-01 00:00:00 UTC' "$PACKAGE_DIR/libvulkan_freedreno.so" "$PACKAGE_DIR/meta.json"
 rm -f "$ZIP_PATH"
-(cd "$PACKAGE_DIR" && zip -9 "$ZIP_PATH" libvulkan_freedreno.so meta.json)
+(cd "$PACKAGE_DIR" && zip -X -9 "$ZIP_PATH" libvulkan_freedreno.so meta.json)
 
 [[ "$(unzip -Z1 "$ZIP_PATH" | sort)" == $'libvulkan_freedreno.so\nmeta.json' ]] || \
   die "unexpected AdrenoTools ZIP contents"
@@ -149,6 +159,10 @@ MAGISK_LIBRARY="$MAGISK_PACKAGE_DIR/system/vendor/lib64/hw/$MAGISK_VULKAN_FILENA
 mkdir -p "${MAGISK_LIBRARY%/*}"
 cp -L "$VULKAN_SO" "$MAGISK_LIBRARY"
 patchelf --set-soname "$MAGISK_VULKAN_FILENAME" "$MAGISK_LIBRARY"
+readelf -h "$MAGISK_LIBRARY" | grep -q 'AArch64' || \
+  die "Magisk driver is not an AArch64 ELF: $MAGISK_LIBRARY"
+readelf -d "$MAGISK_LIBRARY" | grep -Eq "SONAME.*${MAGISK_VULKAN_FILENAME//./\\.}" || \
+  die "Magisk driver SONAME does not match $MAGISK_VULKAN_FILENAME"
 
 cat > "$MAGISK_PACKAGE_DIR/module.prop" <<EOF
 id=mesa-turnip
@@ -164,12 +178,18 @@ Mesa tag: $MESA_TAG
 Mesa commit: $MESA_COMMIT
 Vulkan HAL filename: $MAGISK_VULKAN_FILENAME
 
+This is an experimental global Vulkan override. Prefer the AdrenoTools
+package with per-app driver selection when testing games or Android apps.
+Global replacement can affect Android HWUI and system services. Do not enable
+this module together with another module that overlays the same Vulkan HAL.
+
 The Vulkan HAL filename is device-specific. Override MAGISK_VULKAN_FILENAME
 when building this package. Keep a recovery path and disable this module from
 Magisk Safe Mode if Android fails to boot.
 EOF
 
-(cd "$MAGISK_PACKAGE_DIR" && zip -9 -r "$MAGISK_ZIP_PATH" module.prop README.txt system)
+touch -d '1970-01-01 00:00:00 UTC' "$MAGISK_PACKAGE_DIR/module.prop" "$MAGISK_PACKAGE_DIR/README.txt" "$MAGISK_LIBRARY"
+(cd "$MAGISK_PACKAGE_DIR" && zip -X -9 -r "$MAGISK_ZIP_PATH" module.prop README.txt system)
 unzip -Z1 "$MAGISK_ZIP_PATH" | grep -qx 'module.prop' || \
   die "Magisk module.prop is missing"
 unzip -Z1 "$MAGISK_ZIP_PATH" | grep -qx "system/vendor/lib64/hw/$MAGISK_VULKAN_FILENAME" || \
