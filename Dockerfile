@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-FROM ubuntu:24.04
+FROM ubuntu:24.04@sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517
 
 ENV DEBIAN_FRONTEND=noninteractive \
     ANDROID_NDK_HOME=/opt/android-ndk-r29 \
@@ -48,11 +48,11 @@ WORKDIR /opt
 RUN curl -fsSL \
       https://dl.google.com/android/repository/android-ndk-r29-linux.zip \
       -o /tmp/android-ndk.zip \
+    && echo '87e2bb7e9be5d6a1c6cdf5ec40dd4e0c6d07c30b  /tmp/android-ndk.zip' | sha1sum -c - \
     && unzip -q /tmp/android-ndk.zip -d /opt \
     && rm -f /tmp/android-ndk.zip
 
 COPY build.sh /opt/build.sh
-COPY mesa-build-common.sh /opt/mesa-build-common.sh
-RUN chmod 0755 /opt/build.sh /opt/mesa-build-common.sh
+RUN chmod 0755 /opt/build.sh
 
 ENTRYPOINT ["/opt/build.sh"]
